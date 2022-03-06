@@ -4,9 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.guoziyang.rpc.entity.RpcRequest;
-import top.guoziyang.rpc.enumeration.SerializerCode;
-import top.guoziyang.rpc.exception.SerializeException;
+import entity.RpcRequest;
+import enumeration.SerializerCodeType;
+import exception.SerializeException;
 
 import java.io.IOException;
 
@@ -62,7 +62,7 @@ public class JsonSerializer implements CommonSerializer {
 
     @Override
     public int getCode() {
-        return SerializerCode.valueOf("JSON").getCode();
+        return SerializerCodeType.valueOf("JSON").getCode();
     }
 
 }

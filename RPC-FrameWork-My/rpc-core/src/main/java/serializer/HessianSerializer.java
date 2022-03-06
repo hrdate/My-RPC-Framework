@@ -2,10 +2,10 @@ package serializer;
 
 import com.caucho.hessian.io.HessianInput;
 import com.caucho.hessian.io.HessianOutput;
+import enumeration.SerializerCodeType;
+import exception.SerializeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.guoziyang.rpc.enumeration.SerializerCode;
-import top.guoziyang.rpc.exception.SerializeException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -57,6 +57,6 @@ public class HessianSerializer implements CommonSerializer {
 
     @Override
     public int getCode() {
-        return SerializerCode.valueOf("HESSIAN").getCode();
+        return SerializerCodeType.valueOf("HESSIAN").getCode();
     }
 }

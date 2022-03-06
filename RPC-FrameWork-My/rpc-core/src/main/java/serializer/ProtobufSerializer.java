@@ -43,7 +43,7 @@ public class ProtobufSerializer implements CommonSerializer {
 
     @Override
     public int getCode() {
-        return SerializerCode.valueOf("PROTOBUF").getCode();
+        return SerializerCodeType.valueOf("PROTOBUF").getCode();
     }
 
     @SuppressWarnings("unchecked")
