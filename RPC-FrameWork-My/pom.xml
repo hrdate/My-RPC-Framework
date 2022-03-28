@@ -23,8 +23,8 @@
         <module>rpc-api</module>
         <module>rpc-common</module>
         <module>rpc-core</module>
-        <module>test-client</module>
-        <module>test-server</module>
+        <module>test-socket.client</module>
+        <module>test-socket.server</module>
     </modules>
 
 

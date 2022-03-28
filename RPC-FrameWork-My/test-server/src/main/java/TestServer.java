@@ -1,14 +1,14 @@
-import registry.DefaultServiceRegistry;
-import registry.ServiceRegistry;
-import server.RpcServer;
+import annotation.ServiceScan;
+import netty.server.NettyServer;
 
+import serializer.CommonSerializer;
+
+@ServiceScan
 public class TestServer {
 
     public static void main(String[] args) {
-        HelloService helloService = new HelloServiceImpl();
-        ServiceRegistry serviceRegistry = new DefaultServiceRegistry();
-        serviceRegistry.register(helloService);
-        RpcServer rpcServer = new RpcServer(serviceRegistry);
-        rpcServer.start(9000);
+        NettyServer server = new NettyServer(
+                "127.0.0.1",9998, CommonSerializer.DEFAULT_SERIALIZER);
+        server.start();
     }
 }

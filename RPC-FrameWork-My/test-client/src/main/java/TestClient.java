@@ -1,5 +1,4 @@
-import client.RpcClient;
-import client.RpcClientProxy;
+import netty.client.RpcClientProxy;
 
 public class TestClient {
 
