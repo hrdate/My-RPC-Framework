@@ -30,6 +30,7 @@ test-server	——	测试用提供侧
 
 # 传输协议
 
+```
 +---------------+---------------+-----------------+-------------+
 |  Magic Number |  Package Type | Serializer Type | Data Length |
 |    4 bytes    |    4 bytes    |     4 bytes     |   4 bytes   |
@@ -37,6 +38,14 @@ test-server	——	测试用提供侧
 |                          Data Bytes                           |
 |                   Length: ${Data Length}                      |
 +---------------------------------------------------------------+
+```
 
 
+| 字段            | 解释                                                         |
+| :-------------- | :----------------------------------------------------------- |
+| Magic Number    | 魔数，表识一个 MRF 协议包                                    |
+| Package Type    | 包类型，标明是请求活或响应                                    |
+| Serializer Type | 序列化器类型，标明序列化方式                                 |
+| Data Length     | 数据字节的长度                                               |
+| Data Bytes      | 传输的对象                                                  |
 
