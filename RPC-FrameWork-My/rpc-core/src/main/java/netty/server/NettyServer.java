@@ -12,16 +12,15 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import provider.ServiceProviderImpl;
 import registry.NacosServiceRegistry;
 import serializer.CommonSerializer;
-import serializer.JsonSerializer;
 
-import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
 
-import static serializer.CommonSerializer.DEFAULT_SERIALIZER;
 
 public class NettyServer extends AbstractRpcServer {
 
@@ -43,6 +42,8 @@ public class NettyServer extends AbstractRpcServer {
 
     @Override
     public void start() {
+        ShutdownHook.getShutdownHook().addClearAllHook();
+        // 一个用来接收客户端连接，一个用来处理 I/O 事件
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -51,23 +52,24 @@ public class NettyServer extends AbstractRpcServer {
             serverBootstrap.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
+                    // 设置连接队列个数
                     .option(ChannelOption.SO_BACKLOG, 256)
                     .option(ChannelOption.SO_KEEPALIVE, true)
+                    // 启用Nagle算法
                     .childOption(ChannelOption.TCP_NODELAY, true)
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel ch) throws Exception {
                             ChannelPipeline pipeline = ch.pipeline();
-                            pipeline.addLast(new CommonEncoder(new JsonSerializer()));
-                            pipeline.addLast(new CommonDecoder());
-                            // 责任链的尾部，无需关心字节序列
-                            // 用于接收 RpcRequest，并且执行调用，将调用结果返回封装成 RpcResponse 发送出去。
-                            pipeline.addLast(new NettyServerHandler());
+                            // 心跳包，服务端
+                            pipeline.addLast(new IdleStateHandler(30, 0, 0, TimeUnit.SECONDS))
+                                    .addLast(new CommonEncoder(serializer))
+                                    .addLast(new CommonDecoder())
+                                    // 心跳包响应事件
+                                    .addLast(new NettyServerHandler());
                         }
                     });
-            // 启动之前,清空nacos上次的服务缓存信息
-            ShutdownHook.getShutdownHook().addClearAllHook();
-            ChannelFuture future = serverBootstrap.bind(port).sync();
+            ChannelFuture future = serverBootstrap.bind(host, port).sync();
             future.channel().closeFuture().sync();
 
         } catch (InterruptedException e) {
@@ -77,8 +79,6 @@ public class NettyServer extends AbstractRpcServer {
             workerGroup.shutdownGracefully();
         }
     }
-
-
 
 }
 

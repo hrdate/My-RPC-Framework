@@ -16,7 +16,6 @@ import java.io.ByteArrayOutputStream;
 /**
  * Kryo序列化器
  *
- * @author ziyang
  */
 public class KryoSerializer implements CommonSerializer {
 
@@ -26,7 +25,9 @@ public class KryoSerializer implements CommonSerializer {
         Kryo kryo = new Kryo();
         kryo.register(RpcResponse.class);
         kryo.register(RpcRequest.class);
+        // 循环引用
         kryo.setReferences(true);
+        // 禁止类注册
         kryo.setRegistrationRequired(false);
         return kryo;
     });
@@ -36,6 +37,7 @@ public class KryoSerializer implements CommonSerializer {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
              Output output = new Output(byteArrayOutputStream)) {
             Kryo kryo = kryoThreadLocal.get();
+            //把对象信息生成字节码直接写到序列化数据里，
             kryo.writeObject(output, obj);
             kryoThreadLocal.remove();
             return output.toBytes();
@@ -49,6 +51,7 @@ public class KryoSerializer implements CommonSerializer {
     public Object deserialize(byte[] bytes, Class<?> clazz) {
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
              Input input = new Input(byteArrayInputStream)) {
+            //反序列化的时候可以精确地找到字节码对应原始类信息
             Kryo kryo = kryoThreadLocal.get();
             Object o = kryo.readObject(input, clazz);
             kryoThreadLocal.remove();

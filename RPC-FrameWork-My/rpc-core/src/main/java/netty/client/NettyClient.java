@@ -5,70 +5,89 @@ import codec.CommonDecoder;
 import codec.CommonEncoder;
 import entity.RpcRequest;
 import entity.RpcResponse;
+import enumeration.RpcError;
+import exception.RpcException;
+import factory.SingletonFactory;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.util.AttributeKey;
+import loadbalancer.LoadBalancer;
+import loadbalancer.RandomLoadBalancer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import serializer.JsonSerializer;
+import registry.NacosServiceDiscovery;
+import registry.ServiceDiscovery;
+import serializer.CommonSerializer;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 
 public class NettyClient implements RpcClient {
-
     private static final Logger logger = LoggerFactory.getLogger(NettyClient.class);
-
-    private String host;
-    private int port;
+    private static final EventLoopGroup group;
     private static final Bootstrap bootstrap;
 
-    public NettyClient(String host, int port) {
-        this.host = host;
-        this.port = port;
-    }
-
     static {
-        EventLoopGroup group = new NioEventLoopGroup();
+        group = new NioEventLoopGroup();
         bootstrap = new Bootstrap();
         bootstrap.group(group)
-                .channel(NioSocketChannel.class)
-                .option(ChannelOption.SO_KEEPALIVE, true)
-                .handler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel ch) throws Exception {
-                        ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast(new CommonDecoder())
-                                .addLast(new CommonEncoder(new JsonSerializer()))
-                                // 责任链的尾部，无需关心字节序列
-                                .addLast(new NettyClientHandler());
-                    }
-                });
+                .channel(NioSocketChannel.class);
+    }
+    // 服务发现列表
+    private final ServiceDiscovery serviceDiscovery;
+    private final CommonSerializer serializer;
+    // 类里有个ConcurrentHashMap
+    private final UnprocessedRequests unprocessedRequests;
+
+    public NettyClient() {
+        this(DEFAULT_SERIALIZER, new RandomLoadBalancer());
+    }
+    public NettyClient(LoadBalancer loadBalancer) {
+        this(DEFAULT_SERIALIZER, loadBalancer);
+    }
+    public NettyClient(Integer serializer) {
+        this(serializer, new RandomLoadBalancer());
+    }
+    public NettyClient(Integer serializer, LoadBalancer loadBalancer) {
+        this.serviceDiscovery = new NacosServiceDiscovery(loadBalancer);
+        this.serializer = CommonSerializer.getByCode(serializer);
+        this.unprocessedRequests = SingletonFactory.getInstance(UnprocessedRequests.class);
     }
 
-    public Object sendRequest(RpcRequest rpcRequest) {
-        try {
-            ChannelFuture future = bootstrap.connect(host, port).sync();
-            logger.info("客户端连接到服务器 {}:{}", host, port);
-            Channel channel = future.channel();
-            if(channel != null) {
-                //发送后会立刻返回，而无法得到结果
-                channel.writeAndFlush(rpcRequest).addListener(future1 -> {
-                    if(future1.isSuccess()) {
-                        logger.info(String.format("客户端发送消息: %s", rpcRequest.toString()));
-                    } else {
-                        logger.error("发送消息时有错误发生: ", future1.cause());
-                    }
-                });
-                //阻塞获得返回结果
-                channel.closeFuture().sync();
-                AttributeKey<RpcResponse> key = AttributeKey.valueOf("rpcResponse");
-                RpcResponse rpcResponse = channel.attr(key).get();
-                return rpcResponse.getData();
-            }
-        } catch (InterruptedException e) {
-            logger.error("发送消息时有错误发生: ", e);
+    @Override
+    public CompletableFuture<RpcResponse> sendRequest(RpcRequest rpcRequest) {
+        if (serializer == null) {
+            logger.error("未设置序列化器");
+            throw new RpcException(RpcError.SERIALIZER_NOT_FOUND);
         }
-        return null;
+        CompletableFuture<RpcResponse> resultFuture = new CompletableFuture<>();
+        try {
+            // 根据服务名获取服务地址
+            InetSocketAddress inetSocketAddress = serviceDiscovery.lookupService(rpcRequest.getInterfaceName());
+            // 根据服务地址，建立连接，并获取通道
+            Channel channel = ChannelProvider.get(inetSocketAddress, serializer);
+            if (!channel.isActive()) {
+                group.shutdownGracefully();
+                return null;
+            }
+            // 客户端把请求存储在ConcurrentHashMap中
+            unprocessedRequests.put(rpcRequest.getRequestId(), resultFuture);
+            // 发送请求并添加监听事情等待响应
+            channel.writeAndFlush(rpcRequest).addListener((ChannelFutureListener) future1 -> {
+                if (future1.isSuccess()) {
+                    logger.info(String.format("客户端发送消息: %s", rpcRequest.toString()));
+                } else {
+                    future1.channel().close();
+                    resultFuture.completeExceptionally(future1.cause());
+                    logger.error("发送消息时有错误发生: ", future1.cause());
+                }
+            });
+        } catch (InterruptedException e) {
+            unprocessedRequests.remove(rpcRequest.getRequestId());
+            logger.error(e.getMessage(), e);
+            Thread.currentThread().interrupt();
+        }
+        return resultFuture;
     }
 }
