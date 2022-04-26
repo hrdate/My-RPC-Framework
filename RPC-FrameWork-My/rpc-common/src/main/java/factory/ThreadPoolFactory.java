@@ -10,6 +10,8 @@ import java.util.concurrent.*;
 /**
  * 创建 ThreadPool(线程池) 的工具类. 来自JavaGuide
  *
+ * @author shuang.kou
+ * @createTime 2020年05月26日 16:00:00
  */
 public class ThreadPoolFactory {
     /**

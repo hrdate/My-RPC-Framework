@@ -12,7 +12,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
- * 进行过程调用的处理器
+ * 请求处理器，进行过程调用的处理器
  */
 public class RequestHandler {
 
@@ -23,7 +23,9 @@ public class RequestHandler {
         serviceProvider = new ServiceProviderImpl();
     }
     public Object handle(RpcRequest rpcRequest) {
+        // 根据接口类型获取服务
         Object service = serviceProvider.getServiceProvider(rpcRequest.getInterfaceName());
+        // 执行服务
         return invokeTargetMethod(rpcRequest, service);
     }
 

@@ -61,6 +61,7 @@ public class NettyClient implements RpcClient {
             logger.error("未设置序列化器");
             throw new RpcException(RpcError.SERIALIZER_NOT_FOUND);
         }
+        // 存储请求事情的监听，等待响应结果
         CompletableFuture<RpcResponse> resultFuture = new CompletableFuture<>();
         try {
             // 根据服务名获取服务地址
@@ -73,7 +74,7 @@ public class NettyClient implements RpcClient {
             }
             // 客户端把请求存储在ConcurrentHashMap中
             unprocessedRequests.put(rpcRequest.getRequestId(), resultFuture);
-            // 发送请求并添加监听事情等待响应
+            // 向服务端发请求，并设置监听事情等待响应
             channel.writeAndFlush(rpcRequest).addListener((ChannelFutureListener) future1 -> {
                 if (future1.isSuccess()) {
                     logger.info(String.format("客户端发送消息: %s", rpcRequest.toString()));

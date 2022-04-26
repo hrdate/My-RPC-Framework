@@ -24,7 +24,7 @@
         </dependency>
         <dependency>
             <groupId>com.alibaba.nacos</groupId>
-            <artifactId>nacos-socket.client</artifactId>
+            <artifactId>nacos-client</artifactId>
             <version>1.3.0</version>
         </dependency>
     </dependencies>

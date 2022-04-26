@@ -47,6 +47,7 @@ public class RpcClientProxy implements InvocationHandler {
                 return null;
             }
         }
+        // 验证请求和响应
         RpcMessageChecker.check(rpcRequest, rpcResponse);
         return rpcResponse.getData();
     }

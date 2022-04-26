@@ -1,5 +1,6 @@
 package hook;
 
+import factory.ThreadPoolFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import util.NacosUtil;
@@ -24,7 +25,7 @@ public class ShutdownHook {
         // 这个钩子函数会在 JVM 关闭之前被调用。
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             NacosUtil.clearRegistry();
-            ThreadPoolFactory.shutDownAll();
+//            ThreadPoolFactory.shutDownAll();
         }));
     }
 

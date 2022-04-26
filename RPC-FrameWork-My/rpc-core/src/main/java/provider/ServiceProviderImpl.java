@@ -15,6 +15,12 @@ public class ServiceProviderImpl implements ServiceProvider{
     private final Map<String, Object> serviceMap = new ConcurrentHashMap<>();
     private final Set<String> registeredService = ConcurrentHashMap.newKeySet();
 
+    /**
+     * 添加服务
+     * @param service 服务类
+     * @param serviceName 服务名称
+     * @param <T> 泛型
+     */
     @Override
     public synchronized <T> void addServiceProvider(T service,String serviceName) {
 //        String serviceName = service.getClass().getCanonicalName();
@@ -30,6 +36,11 @@ public class ServiceProviderImpl implements ServiceProvider{
         logger.info("向接口: {} 注册服务: {}", interfaceArray, serviceName);
     }
 
+    /**
+     * 根据服务名称获取服务
+     * @param serviceName 服务名称
+     * @return 服务
+     */
     @Override
     public synchronized Object getServiceProvider(String serviceName) {
         Object service = serviceMap.get(serviceName);
