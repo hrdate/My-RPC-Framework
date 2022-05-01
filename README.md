@@ -1,6 +1,6 @@
 # My-RPC-Framework
 
-简易RPC框架Demo，学习中...
+手写RPC简易版框架Demo，学习中...
 一款基于 Nacos 实现的 RPC 轻量级框架
 
 
