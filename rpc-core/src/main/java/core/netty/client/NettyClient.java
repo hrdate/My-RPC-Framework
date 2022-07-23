@@ -72,7 +72,7 @@ public class NettyClient implements RpcClient {
             }
             // 客户端把请求存储在ConcurrentHashMap的CompletableFuture中
             unprocessedRequests.put(rpcRequest.getRequestId(), resultFuture);
-            // 向服务端发请求，并设置监听事情等待响应
+            // 异步向服务端发请求，并设置监听事情等待响应，添加异步回调事件
             channel.writeAndFlush(rpcRequest).addListener((ChannelFutureListener) future1 -> {
                 if (future1.isSuccess()) {
                     logger.info(String.format("客户端发送消息: %s", rpcRequest.toString()));

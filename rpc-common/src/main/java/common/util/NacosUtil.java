@@ -5,16 +5,14 @@ import com.alibaba.nacos.api.exception.NacosException;
 import com.alibaba.nacos.api.naming.NamingFactory;
 import com.alibaba.nacos.api.naming.NamingService;
 import com.alibaba.nacos.api.naming.pojo.Instance;
+import common.enumeration.RpcConfigEnum;
 import common.enumeration.RpcError;
 import common.exception.RpcException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 管理Nacos连接等工具类
@@ -27,19 +25,21 @@ public class NacosUtil {
     private static final Set<String> serviceNames = new HashSet<>();
     private static InetSocketAddress address;
 
-    private static final String SERVER_ADDR = "127.0.0.1:8848";
+    private static final String DEFAULT_NACOS_SERVER_ADDR = "127.0.0.1:8848";
 
     static {
         namingService = getNacosNamingService();
     }
 
     /**
-     *
+     * 先通过工具栏尝试获取配置文件中的nacos地址,若无则采用默认值
      * @return 连接注册中心nacos的服务
      */
     public static NamingService getNacosNamingService() {
         try {
-            return NamingFactory.createNamingService(SERVER_ADDR);
+            Properties properties = PropertiesFileUtil.readPropertiesFile(RpcConfigEnum.RPC_CONFIG_PATH.getPropertyValue());
+            String nacosAddress = properties != null && properties.getProperty(RpcConfigEnum.NACOS_ADDRESS.getPropertyValue()) != null ? properties.getProperty(RpcConfigEnum.NACOS_ADDRESS.getPropertyValue()) : DEFAULT_NACOS_SERVER_ADDR;
+            return NamingFactory.createNamingService(nacosAddress);
         } catch (NacosException e) {
             logger.error("连接到Nacos时有错误发生: ", e);
             throw new RpcException(RpcError.FAILED_TO_CONNECT_TO_SERVICE_REGISTRY);
