@@ -23,6 +23,40 @@ test-server	——	测试用提供侧
 
 
 
+1. 实现了基于 Netty 传输网络传输方式，采用多对多线程模型
+2. 使用Nacos作业注册中心，管理服务提供者信息
+3. JDK动态代理增强方法
+4. 自定义传输协议
+5. 实现两种负载均衡算法：随机算法与轮转算法
+6. 通过netty编码解码兼容多种序列化工具
+7. 自定义注解@ServiceScan和@Service实现服务扫描自动注册
+8. CompletableFuture实例异步获取netty请求的响应结果
+9. 钩子函数ShutdownHook优雅下线
+10. 使用netty心跳机制，检测保持连接
+11. 客户端启动时使用countDownLatch实现连接失败重试机制
+
+
+
+
+
+## 引入注册中心nacos
+
+采用Docker的方式导入nacos镜像
+
+单机版运行指令
+
+```
+1：docker pull docker.io/nacos/nacos-server
+
+2：docker run --env MODE=standalone --name nacos -d -p 8848:8848 nacos/nacos-server
+```
+
+登陆地址：http://localhost:8848/nacos/index.html默认账号密码是nacos/nacos
+
+如要把服务信息保存在MySQL数据库中，可自行搜索资料修改Docker实例里面的/home/nacos/conf/application.properties文件
+
+
+
 ## 动态代理
 
 采用 **JDK 动态代理**方法完成客户端请求的封装、服务端对请求的动态解析
@@ -106,7 +140,7 @@ try {
         .其他配置操作
 ```
 
-## 编码译码
+## 编码译码-序列化
 
 自定义`netty`的**通用编码和译码拦截器**，兼容多种主流的序列化`CommonSerializer`工具，例如Java自带序列、fastjson、kyro等
 
@@ -140,7 +174,7 @@ public class CommonDecoder extends ReplayingDecoder {
 
 负载均衡`LoadBalancer`实现了随机和轮询两种算法
 
-## 服务扫描
+## 服务扫描-自动注册
 
 采用注解**@Service表示服务类**
 
@@ -184,6 +218,10 @@ public void addClearAllHook() {
 }
 ```
 
+
+
+## 异步获取Netty请求的响应结果
+
 采用异步获取Netty请求的响应结果，将每个请求对应的CompletableFuture实例都保存在一个Map中，其中key为请求ID
 
 ```java
@@ -192,6 +230,37 @@ public class UnprocessedRequests {  //未处理请求
     ...其他内容
 }
 ```
+
+jdk代理增加发送信息接口，请求响应`rpcResponse = completableFuture.get();`
+
+```java
+@Override
+public Object invoke(Object proxy, Method method, Object[] args) {
+  logger.info("调用方法: {}#{}", method.getDeclaringClass().getName(), method.getName());
+  // 生成客户端请求id，并组装一个请求RpcRequest实体类
+  RpcRequest rpcRequest = new RpcRequest(UUID.randomUUID().toString(), method.getDeclaringClass().getName(),
+                                         method.getName(), args, method.getParameterTypes(), false);
+  RpcResponse rpcResponse = null;
+  if (client instanceof NettyClient) {
+    try {
+      CompletableFuture<RpcResponse> completableFuture = (CompletableFuture<RpcResponse>) client.sendRequest(rpcRequest);
+      rpcResponse = completableFuture.get();
+    } catch (Exception e) {
+      logger.error("方法调用请求发送失败", e);
+      return null;
+    }
+  }
+  // 验证请求和响应
+  RpcMessageChecker.check(rpcRequest, rpcResponse);
+  return rpcResponse.getData();
+}
+```
+
+
+
+
+
+## 数据校验
 
 利用请求号对服务端返回的响应数据进行校验，保证请求与响应一一对应
 
@@ -206,7 +275,63 @@ public Object invoke(Object proxy, Method method, Object[] args) {
 }
 ```
 
-## 心跳机制
+客户端校验
+
+```java
+public static void check(RpcRequest rpcRequest, RpcResponse rpcResponse) {
+        if (rpcResponse == null) {
+            logger.error("调用服务失败,serviceName:{}", rpcRequest.getInterfaceName());
+            throw new RpcException(RpcError.SERVICE_INVOCATION_FAILURE, INTERFACE_NAME + ":" + rpcRequest.getInterfaceName());
+        }
+
+        if (!rpcRequest.getRequestId().equals(rpcResponse.getRequestId())) {
+            throw new RpcException(RpcError.RESPONSE_NOT_MATCH, INTERFACE_NAME + ":" + rpcRequest.getInterfaceName());
+        }
+
+        if (rpcResponse.getStatusCode() == null || !rpcResponse.getStatusCode().equals(ResponseCode.SUCCESS.getCode())) {
+            logger.error("调用服务失败,serviceName:{},RpcResponse:{}", rpcRequest.getInterfaceName(), rpcResponse);
+            throw new RpcException(RpcError.SERVICE_INVOCATION_FAILURE, INTERFACE_NAME + ":" + rpcRequest.getInterfaceName());
+        }
+}
+```
+
+netty编码解码都可以起到校验的作用
+
+```java
+@Override
+protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        int magic = in.readInt();
+        if (magic != MAGIC_NUMBER) {
+            logger.error("不识别的协议包: {}", magic);
+            throw new RpcException(RpcError.UNKNOWN_PROTOCOL);
+        }
+        int packageCode = in.readInt();
+        Class<?> packageClass;
+        if (packageCode == PackageType.REQUEST_PACK.getCode()) {
+            packageClass = RpcRequest.class;
+        } else if (packageCode == PackageType.RESPONSE_PACK.getCode()) {
+            packageClass = RpcResponse.class;
+        } else {
+            logger.error("不识别的数据包: {}", packageCode);
+            throw new RpcException(RpcError.UNKNOWN_PACKAGE_TYPE);
+        }
+        int serializerCode = in.readInt();
+        CommonSerializer serializer = CommonSerializer.getByCode(serializerCode);
+        if (serializer == null) {
+            logger.error("不识别的反序列化器: {}", serializerCode);
+            throw new RpcException(RpcError.UNKNOWN_SERIALIZER);
+        }
+        int length = in.readInt();
+        byte[] bytes = new byte[length];
+        in.readBytes(bytes);
+        Object obj = serializer.deserialize(bytes, packageClass);
+        out.add(obj);
+}
+```
+
+
+
+## Netty心跳机制
 
 采用 Netty 的**心跳机制** IdleStateEvent，保证连接
 
@@ -301,3 +426,19 @@ private static Channel connect(Bootstrap bootstrap, InetSocketAddress inetSocket
 ```
 
 
+
+服务端启动成功后，打印的部分日志
+
+![image-20220723115136071](README.assets/image-20220723115136071.png)
+
+
+
+客户端成功启动并发送请求后，打印的部分日志
+
+![image-20220723115224929](README.assets/image-20220723115224929.png)
+
+
+
+成功注册项目后，nacos控制台现实界面
+
+![image-20220723022512028](README.assets/image-20220723022512028.png)
