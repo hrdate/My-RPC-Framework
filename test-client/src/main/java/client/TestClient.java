@@ -1,5 +1,6 @@
 package client;
 
+import api.ByeService;
 import api.HelloObject;
 import api.HelloService;
 import core.netty.client.NettyClient;
@@ -12,11 +13,15 @@ import core.serializer.CommonSerializer;
  */
 public class TestClient {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         RpcClient client = new NettyClient(CommonSerializer.PROTOBUF_SERIALIZER);
         RpcClientProxy rpcClientProxy = new RpcClientProxy(client);
         HelloService helloService = rpcClientProxy.getProxy(HelloService.class);
         String hello = helloService.hello(new HelloObject(123, "This is a test message!"));
         System.out.println("客户端收到回复:" + hello);
+        Thread.sleep(5000);
+        ByeService byeService = rpcClientProxy.getProxy(ByeService.class);
+        String bye = byeService.bye("This is a test message for bye!");
+        System.out.println("客户端收到回复:" + bye);
     }
 }

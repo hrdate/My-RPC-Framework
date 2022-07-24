@@ -1,5 +1,6 @@
 package core.codec;
 
+import common.compress.gzip.GzipCompress;
 import core.serializer.CommonSerializer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -48,6 +49,8 @@ public class CommonDecoder extends ReplayingDecoder {
         int length = in.readInt();
         byte[] bytes = new byte[length];
         in.readBytes(bytes);
+        GzipCompress gzipCompress = new GzipCompress();
+        bytes = gzipCompress.decompress(bytes);
         Object obj = serializer.deserialize(bytes, packageClass);
         out.add(obj);
     }

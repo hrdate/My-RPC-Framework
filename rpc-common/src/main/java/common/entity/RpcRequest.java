@@ -18,6 +18,10 @@ import java.io.Serializable;
 public class RpcRequest implements Serializable {
 
     /**
+     * compress type
+     */
+//    private byte compress;
+    /**
      * 请求号
      */
     private String requestId;

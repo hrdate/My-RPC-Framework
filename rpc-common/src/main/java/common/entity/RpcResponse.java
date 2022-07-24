@@ -15,6 +15,10 @@ import java.io.Serializable;
 public class RpcResponse<T> implements Serializable {
 
     /**
+     * compress type
+     */
+//    private byte compress;
+    /**
      * 响应对应的请求号
      */
     private String requestId;
@@ -23,6 +27,7 @@ public class RpcResponse<T> implements Serializable {
      * 响应状态码
      */
     private Integer statusCode;
+
     /**
      * 响应状态补充信息
      */

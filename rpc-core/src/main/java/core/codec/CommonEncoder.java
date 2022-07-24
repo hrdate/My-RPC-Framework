@@ -1,5 +1,6 @@
 package core.codec;
 
+import common.compress.gzip.GzipCompress;
 import core.serializer.CommonSerializer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -31,6 +32,8 @@ public class CommonEncoder extends MessageToByteEncoder {
         }
         out.writeInt(serializer.getCode());
         byte[] bytes = serializer.serialize(msg);
+        GzipCompress gzipCompress = new GzipCompress();
+        bytes = gzipCompress.compress(bytes);
         out.writeInt(bytes.length);
         out.writeBytes(bytes);
     }
